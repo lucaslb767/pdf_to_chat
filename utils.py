@@ -1,6 +1,7 @@
 from pathlib import Path
 from langchain_community.document_loaders.pdf import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.prompts import PromptTemplate
 from langchain_openai.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_openai.chat_models import ChatOpenAI
@@ -9,10 +10,13 @@ from langchain.chains.conversational_retrieval.base import ConversationalRetriev
 from dotenv import load_dotenv, find_dotenv
 
 import streamlit as st
+from configs import *
+
 _ = load_dotenv(find_dotenv())
 
 FILE_DIRECTORY = Path(__file__).parent / 'files'
-MODEL_NAME = 'gpt-4o-mini'
+
+
 
 def document_loading():
     documents = []
@@ -51,19 +55,24 @@ def create_conversation_chain():
     vector_store = vectorStore(documents)
 
 
-    chat = ChatOpenAI(model=MODEL_NAME)
+    chat = ChatOpenAI(model=get_config('model_name'))
     memory = ConversationBufferMemory(
         return_messages=True,
         memory_key='chat_history',
         output_key='answer'
         )
-    retriever = vector_store.as_retriever()
+    retriever = vector_store.as_retriever(
+        search_type = get_config('retrieval_search_type'),
+        search_kwargs= get_config('retrieval_kwargs')
+    )
+    prompt_template = PromptTemplate.from_template(get_config('prompt'))
     chat_chain = ConversationalRetrievalChain.from_llm(
         llm=chat,
         memory = memory,
         retriever = retriever,
         return_source_documents = True,
-        verbose=True
+        verbose=True,
+        combine_docs_chain_kwargs={'prompt': prompt_template}
     )
 
     st.session_state['chain'] = chat_chain
